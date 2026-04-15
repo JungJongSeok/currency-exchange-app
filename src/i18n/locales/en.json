@@ -1,0 +1,47 @@
+{
+  "app": {
+    "title": "Currency Exchange",
+    "tagline": "Live rates with offline cache"
+  },
+  "common": {
+    "error": "Error",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "confirm": "OK",
+    "delete": "Delete",
+    "save": "Save",
+    "loading": "Loading...",
+    "reset": "Reset",
+    "close": "Close"
+  },
+  "exchange": {
+    "amountLabel": "Amount",
+    "amountPlaceholder": "0",
+    "amountAccessibility": "Amount input",
+    "fromLabel": "From",
+    "toLabel": "To",
+    "swap": "Swap currency pair",
+    "convert": "Convert",
+    "resultTitle": "Result",
+    "rateLine": "1 {{from}} = {{rate}} {{to}}",
+    "fetchedAt": "Fetched {{time}}",
+    "stale": "Cached {{minutes}} min ago",
+    "staleBadge": "⚠️ Cache older than 30 min",
+    "favoriteAdd": "Add to favorites",
+    "favoriteRemove": "Remove from favorites",
+    "recentTitle": "Recent lookups",
+    "recentEmpty": "No recent lookups yet",
+    "favoritesTitle": "Favorite pairs",
+    "favoritesEmpty": "No favorite pairs yet",
+    "loading": "Fetching rate...",
+    "errorNetwork": "Couldn't fetch the rate. Please check your connection.",
+    "errorGeneric": "Conversion failed. Please try again.",
+    "pickFrom": "Select source currency",
+    "pickTo": "Select target currency"
+  },
+  "picker": {
+    "title": "Select currency",
+    "searchPlaceholder": "Search by code or name",
+    "empty": "No matching currencies"
+  }
+}

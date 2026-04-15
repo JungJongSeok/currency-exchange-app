@@ -1,0 +1,47 @@
+{
+  "app": {
+    "title": "환율 변환기",
+    "tagline": "실시간 환율 조회 + 오프라인 캐시"
+  },
+  "common": {
+    "error": "오류",
+    "retry": "다시 시도",
+    "cancel": "취소",
+    "confirm": "확인",
+    "delete": "삭제",
+    "save": "저장",
+    "loading": "로딩 중...",
+    "reset": "초기화",
+    "close": "닫기"
+  },
+  "exchange": {
+    "amountLabel": "금액",
+    "amountPlaceholder": "0",
+    "amountAccessibility": "금액 입력",
+    "fromLabel": "보유",
+    "toLabel": "변환",
+    "swap": "통화 쌍 전환",
+    "convert": "변환하기",
+    "resultTitle": "변환 결과",
+    "rateLine": "1 {{from}} = {{rate}} {{to}}",
+    "fetchedAt": "{{time}} 조회",
+    "stale": "{{minutes}}분 전 캐시",
+    "staleBadge": "⚠️ 30분 이상 지난 캐시",
+    "favoriteAdd": "즐겨찾기 추가",
+    "favoriteRemove": "즐겨찾기 해제",
+    "recentTitle": "최근 조회",
+    "recentEmpty": "최근 조회 내역이 없어요",
+    "favoritesTitle": "즐겨찾는 통화 쌍",
+    "favoritesEmpty": "즐겨찾는 통화 쌍이 없어요",
+    "loading": "환율 가져오는 중...",
+    "errorNetwork": "환율을 가져오지 못했어요. 네트워크 연결을 확인해주세요.",
+    "errorGeneric": "변환에 실패했어요. 다시 시도해주세요.",
+    "pickFrom": "보유 통화 선택",
+    "pickTo": "변환 통화 선택"
+  },
+  "picker": {
+    "title": "통화 선택",
+    "searchPlaceholder": "코드 또는 이름 검색",
+    "empty": "일치하는 통화가 없어요"
+  }
+}
