@@ -29,6 +29,8 @@ export interface CurrencyState {
   exchangeState: ExchangeState;
   history: RecentLookup[];
   favorites: FavoritePair[];
+  /** Cached rate previews for favorite tiles, keyed by `${from}:${to}`. */
+  cachedRates: Record<string, ExchangeRate | null>;
 }
 
 const initialState: CurrencyState = {
@@ -40,6 +42,7 @@ const initialState: CurrencyState = {
   exchangeState: {kind: 'idle'},
   history: [],
   favorites: [],
+  cachedRates: {},
 };
 
 export const loadCurrencies = createAsyncThunk<ReadonlyArray<CurrencyInfo>>(
@@ -83,6 +86,30 @@ export const convert = createAsyncThunk<ConvertResultPayload, ConvertPayload>(
     return {rate, input: amount, output};
   },
 );
+
+export interface CachedRateEntry {
+  readonly key: string;
+  readonly rate: ExchangeRate | null;
+}
+
+/**
+ * Batch-load cached rate previews for the supplied pairs. No network I/O —
+ * any pair without a cache entry resolves to `null`. Used by the favorites
+ * section to render rate / staleness hints inline.
+ */
+export const loadCachedRatesForFavorites = createAsyncThunk<
+  ReadonlyArray<CachedRateEntry>,
+  ReadonlyArray<{readonly from: CurrencyCode; readonly to: CurrencyCode}>
+>('currency/loadCachedRatesForFavorites', async pairs => {
+  const repo = getCurrencyRepository();
+  const entries = await Promise.all(
+    pairs.map(async (pair): Promise<CachedRateEntry> => {
+      const rate = await repo.getCachedRate(pair.from, pair.to);
+      return {key: `${pair.from}:${pair.to}`, rate};
+    }),
+  );
+  return entries;
+});
 
 export const addToHistory = createAsyncThunk<
   ReadonlyArray<RecentLookup>,
@@ -201,6 +228,15 @@ const currencySlice = createSlice({
       })
       .addCase(removeFavorite.fulfilled, (state, action) => {
         state.favorites = [...action.payload];
+      })
+      .addCase(loadCachedRatesForFavorites.fulfilled, (state, action) => {
+        const next: Record<string, ExchangeRate | null> = {
+          ...state.cachedRates,
+        };
+        for (const entry of action.payload) {
+          next[entry.key] = entry.rate;
+        }
+        state.cachedRates = next;
       });
   },
 });

@@ -9,6 +9,7 @@ export {
   addToHistory,
   addFavorite,
   removeFavorite,
+  loadCachedRatesForFavorites,
   fromChanged,
   toChanged,
   pairSwapped,
@@ -29,6 +30,7 @@ export {
   selectFavorites,
   selectIsFavorited,
   selectCurrentFavoriteId,
+  selectCachedRates,
 } from './selectors';
 export {
   setCurrencyRepository,

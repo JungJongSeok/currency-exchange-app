@@ -145,4 +145,27 @@ describe('FrankfurterCurrencyRepository', () => {
     });
     await expect(repo.getRate('USD', 'KRW')).rejects.toBeInstanceOf(AppError);
   });
+
+  it('Given 캐시 없음 When getCachedRate Then 네트워크 호출 없이 null 반환', async () => {
+    const {repo} = makeRepo(async () => {
+      throw new Error('should not be called');
+    });
+    const result = await repo.getCachedRate('USD', 'KRW');
+    expect(result).toBeNull();
+  });
+
+  it('Given 캐시 존재 When getCachedRate Then 네트워크 없이 ExchangeRate 반환', async () => {
+    const {repo, cache} = makeRepo(async () => {
+      throw new Error('should not be called');
+    });
+    cache.setFresh('USD', 'KRW', {
+      rate: 1340.25,
+      fetchedAt: '2026-04-15T12:00:00.000Z',
+    });
+    const result = await repo.getCachedRate('USD', 'KRW');
+    expect(result).not.toBeNull();
+    expect(result?.rate).toBe(1340.25);
+    expect(result?.from).toBe('USD');
+    expect(result?.to).toBe('KRW');
+  });
 });

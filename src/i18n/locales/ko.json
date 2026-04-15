@@ -29,6 +29,18 @@
     "staleBadge": "⚠️ 30분 이상 지난 캐시",
     "favoriteAdd": "즐겨찾기 추가",
     "favoriteRemove": "즐겨찾기 해제",
+    "favoriteBadge": "즐겨찾기",
+    "favoriteNoCachedRate": "환율 정보 없음 — 탭하여 조회",
+    "favoriteStaleMarker": "⚠️ 오래됨",
+    "favoritePreview": "1 {{from}} ≈ {{rate}} {{to}}",
+    "favoriteMetaLine": "{{preview}}  •  {{time}}",
+    "favoriteMetaLineStale": "{{preview}}  •  {{time}}  {{stale}}",
+    "favoriteArrow": "→",
+    "favoriteAccessibility": "{{fromName}} 에서 {{toName}} 즐겨찾기, 탭하여 변환, 길게 눌러 삭제",
+    "favoriteDeleteTitle": "즐겨찾기 삭제",
+    "favoriteDeleteMessage": "{{from}} → {{to}} 쌍을 즐겨찾기에서 제거할까요?",
+    "favoritesEmptyTitle": "자주 쓰는 통화 조합을 저장하세요",
+    "favoritesEmptySubtitle": "상단 별 아이콘을 탭해서 즐겨찾기 추가",
     "recentTitle": "최근 조회",
     "recentEmpty": "최근 조회 내역이 없어요",
     "favoritesTitle": "즐겨찾는 통화 쌍",
@@ -37,7 +49,13 @@
     "errorNetwork": "환율을 가져오지 못했어요. 네트워크 연결을 확인해주세요.",
     "errorGeneric": "변환에 실패했어요. 다시 시도해주세요.",
     "pickFrom": "보유 통화 선택",
-    "pickTo": "변환 통화 선택"
+    "pickTo": "변환 통화 선택",
+    "relativeTime": {
+      "justNow": "방금",
+      "minutes": "{{value}}분 전",
+      "hours": "{{value}}시간 전",
+      "days": "{{value}}일 전"
+    }
   },
   "picker": {
     "title": "통화 선택",

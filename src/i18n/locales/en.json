@@ -29,6 +29,18 @@
     "staleBadge": "⚠️ Cache older than 30 min",
     "favoriteAdd": "Add to favorites",
     "favoriteRemove": "Remove from favorites",
+    "favoriteBadge": "Favorited",
+    "favoriteNoCachedRate": "No rate yet — tap to fetch",
+    "favoriteStaleMarker": "⚠️ Stale",
+    "favoritePreview": "1 {{from}} ≈ {{rate}} {{to}}",
+    "favoriteMetaLine": "{{preview}}  •  {{time}}",
+    "favoriteMetaLineStale": "{{preview}}  •  {{time}}  {{stale}}",
+    "favoriteArrow": "→",
+    "favoriteAccessibility": "{{fromName}} to {{toName}} favorite, tap to convert, long-press to delete",
+    "favoriteDeleteTitle": "Remove favorite",
+    "favoriteDeleteMessage": "Remove the {{from}} → {{to}} pair from favorites?",
+    "favoritesEmptyTitle": "Save your most-used currency pairs",
+    "favoritesEmptySubtitle": "Tap the star above to add a favorite",
     "recentTitle": "Recent lookups",
     "recentEmpty": "No recent lookups yet",
     "favoritesTitle": "Favorite pairs",
@@ -37,7 +49,13 @@
     "errorNetwork": "Couldn't fetch the rate. Please check your connection.",
     "errorGeneric": "Conversion failed. Please try again.",
     "pickFrom": "Select source currency",
-    "pickTo": "Select target currency"
+    "pickTo": "Select target currency",
+    "relativeTime": {
+      "justNow": "just now",
+      "minutes": "{{value}} min ago",
+      "hours": "{{value}} hr ago",
+      "days": "{{value}} d ago"
+    }
   },
   "picker": {
     "title": "Select currency",

@@ -36,6 +36,7 @@ export const componentSize = {
   iconBase: 24,
   iconLg: 32,
   iconXl: 40,
+  iconXxl: 48,
 
   headerHeight: 56,
 

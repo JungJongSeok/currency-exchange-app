@@ -1,6 +1,7 @@
 import type {
   CurrencyCode,
   CurrencyInfo,
+  ExchangeRate,
   ExchangeState,
   FavoritePair,
   RecentLookup,
@@ -54,3 +55,7 @@ export const selectCurrentFavoriteId = (state: RootState): string | null => {
   );
   return match?.id ?? null;
 };
+
+export const selectCachedRates = (
+  state: RootState,
+): Readonly<Record<string, ExchangeRate | null>> => state.currency.cachedRates;

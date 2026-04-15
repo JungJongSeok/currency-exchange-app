@@ -2,17 +2,20 @@
  * ExchangeScreen — single screen that drives the entire currency exchange
  * flow. Layout (top → bottom, flush with header per CLAUDE.md rules):
  *
- *   1. Pair selector row (From chip · swap · To chip)
+ *   1. Pair selector row (From chip · swap · To chip · ★ favorite toggle)
  *   2. Amount input
  *   3. Convert button
  *   4. Result card (output · rate line · fetched timestamp · stale badge)
- *   5. Favorite star toggle
- *   6. Recent lookups horizontal scroll (max 10)
- *   7. Favorite pairs row (max 20)
+ *   5. Recent lookups horizontal scroll (max 10)
+ *   6. Favorite pairs as rich tiles (max 20)
+ *
+ * The favorite ★ toggle lives in the pair row so it's visible before any
+ * conversion has happened (single source of truth — removed from result card).
  */
 
 import React, {useEffect, useRef, useState} from 'react';
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -25,20 +28,25 @@ import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import type {
   CurrencyCode,
   ExchangeRate,
+  FavoritePair,
 } from '../../domain/models/Currency';
+import {currencyToFlag} from '../../domain/usecases/currencyToFlag';
 import {formatCurrencyAmount} from '../../domain/usecases/formatCurrencyAmount';
+import {relativeTimeDescriptor} from '../../domain/usecases/formatRelativeTime';
 import {
   addFavorite,
   addToHistory,
   amountChanged,
   convert,
   fromChanged,
+  loadCachedRatesForFavorites,
   loadCurrencies,
   loadFavorites,
   loadHistory,
   pairRestored,
   pairSwapped,
   removeFavorite,
+  selectCachedRates,
   selectCurrencies,
   selectCurrentAmount,
   selectCurrentFavoriteId,
@@ -117,6 +125,7 @@ export const ExchangeScreen: React.FC = () => {
   const favorites = useAppSelector(selectFavorites);
   const isFavorited = useAppSelector(selectIsFavorited);
   const currentFavoriteId = useAppSelector(selectCurrentFavoriteId);
+  const cachedRates = useAppSelector(selectCachedRates);
 
   const [amountText, setAmountText] = useState<string>('1');
   const pickerRef = useRef<CurrencyPickerSheetRef>(null);
@@ -128,6 +137,24 @@ export const ExchangeScreen: React.FC = () => {
     dispatch(loadHistory());
     dispatch(loadFavorites());
   }, [dispatch]);
+
+  // Refresh cached rate previews whenever the favorite list or the selected
+  // pair changes (a fresh conversion may have just populated the cache).
+  useEffect(() => {
+    if (favorites.length === 0) {
+      return;
+    }
+    dispatch(
+      loadCachedRatesForFavorites(
+        favorites.map(pair => ({from: pair.from, to: pair.to})),
+      ),
+    );
+  }, [dispatch, favorites, exchangeState]);
+
+  const currencyNameLookup = (code: CurrencyCode): string => {
+    const match = currencies.find(c => c.code === code);
+    return match?.name ?? code;
+  };
 
   const handleAmountChange = (text: string): void => {
     setAmountText(text);
@@ -189,11 +216,33 @@ export const ExchangeScreen: React.FC = () => {
     setAmountText(entry.amount.toString());
   };
 
-  const handleRestoreFavorite = (pair: {
-    from: CurrencyCode;
-    to: CurrencyCode;
-  }): void => {
+  const handleRestoreFavorite = (pair: FavoritePair): void => {
     dispatch(pairRestored({from: pair.from, to: pair.to}));
+    if (amount > 0) {
+      // Defer one microtask so the slice state settles first.
+      void Promise.resolve().then(() => {
+        dispatch(convert({from: pair.from, to: pair.to, amount}))
+          .unwrap()
+          .catch(err => logger.warn('favorite auto-convert failed', err));
+      });
+    }
+  };
+
+  const handleLongPressFavorite = (pair: FavoritePair): void => {
+    Alert.alert(
+      t('exchange.favoriteDeleteTitle'),
+      t('exchange.favoriteDeleteMessage', {from: pair.from, to: pair.to}),
+      [
+        {text: t('common.cancel'), style: 'cancel'},
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: () => {
+            dispatch(removeFavorite(pair.id));
+          },
+        },
+      ],
+    );
   };
 
   const ready = exchangeState.kind === 'ready' ? exchangeState.result : null;
@@ -202,12 +251,73 @@ export const ExchangeScreen: React.FC = () => {
 
   const resultRate: ExchangeRate | null = ready?.rate ?? null;
 
+  const renderRelativeTime = (iso: string): string => {
+    const d = relativeTimeDescriptor(iso, Date.now());
+    return t(`exchange.relativeTime.${d.kind}`, {value: d.value});
+  };
+
+  const renderFavoriteTile = (pair: FavoritePair): React.ReactElement => {
+    const cacheKey = `${pair.from}:${pair.to}`;
+    const cached = cachedRates[cacheKey];
+    const fromName = currencyNameLookup(pair.from);
+    const toName = currencyNameLookup(pair.to);
+    const arrow = t('exchange.favoriteArrow');
+
+    let metaLine: string;
+    if (cached != null) {
+      const preview = t('exchange.favoritePreview', {
+        from: pair.from,
+        rate: formatRate(cached.rate),
+        to: pair.to,
+      });
+      const time = renderRelativeTime(cached.fetchedAt);
+      if (cached.isStale) {
+        metaLine = t('exchange.favoriteMetaLineStale', {
+          preview,
+          time,
+          stale: t('exchange.favoriteStaleMarker'),
+        });
+      } else {
+        metaLine = t('exchange.favoriteMetaLine', {preview, time});
+      }
+    } else {
+      metaLine = t('exchange.favoriteNoCachedRate');
+    }
+
+    return (
+      <ThrottledPressable
+        key={pair.id}
+        testID={`exchange.favorite.${pair.id}`}
+        accessibilityRole="button"
+        accessibilityLabel={t('exchange.favoriteAccessibility', {
+          fromName,
+          toName,
+        })}
+        style={({pressed}) => [
+          styles.favoriteTile,
+          pressed ? styles.favoriteTilePressed : null,
+        ]}
+        onPress={() => handleRestoreFavorite(pair)}
+        onLongPress={() => handleLongPressFavorite(pair)}>
+        <Text style={styles.favoriteTileTitle}>
+          {`${currencyToFlag(pair.from)}  ${pair.from}  ${arrow}  ${currencyToFlag(pair.to)}  ${pair.to}`}
+        </Text>
+        <Text style={styles.favoriteTileNames} numberOfLines={1}>
+          {`${fromName} ${arrow} ${toName}`}
+        </Text>
+        <Text style={styles.favoriteTileMeta} numberOfLines={1}>
+          {metaLine}
+        </Text>
+      </ThrottledPressable>
+    );
+  };
+
   return (
     <View style={styles.root} testID="screen.exchange">
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled">
-        {/* 1. Pair selector row */}
+        {/* 1. Pair selector row + favorite toggle */}
         <View style={styles.pairRow}>
           <ThrottledPressable
             testID="exchange.pair.from"
@@ -220,6 +330,19 @@ export const ExchangeScreen: React.FC = () => {
             onPress={openFromPicker}>
             <Text style={styles.pairChipLabel}>{t('exchange.fromLabel')}</Text>
             <Text style={styles.pairChipCode}>{from}</Text>
+            {isFavorited ? (
+              <View
+                testID="exchange.pair.from.favoriteBadge"
+                style={styles.pairChipBadge}
+                pointerEvents="none">
+                <PlatformIcon
+                  name="star"
+                  Component={MaterialIcon}
+                  size={theme.componentSize.iconSm}
+                  color={theme.colors.secondary}
+                />
+              </View>
+            ) : null}
           </ThrottledPressable>
 
           <ThrottledPressable
@@ -250,6 +373,45 @@ export const ExchangeScreen: React.FC = () => {
             onPress={openToPicker}>
             <Text style={styles.pairChipLabel}>{t('exchange.toLabel')}</Text>
             <Text style={styles.pairChipCode}>{to}</Text>
+            {isFavorited ? (
+              <View
+                testID="exchange.pair.to.favoriteBadge"
+                style={styles.pairChipBadge}
+                pointerEvents="none">
+                <PlatformIcon
+                  name="star"
+                  Component={MaterialIcon}
+                  size={theme.componentSize.iconSm}
+                  color={theme.colors.secondary}
+                />
+              </View>
+            ) : null}
+          </ThrottledPressable>
+
+          <ThrottledPressable
+            testID="exchange.favoriteToggle"
+            accessibilityRole="button"
+            accessibilityState={{checked: isFavorited}}
+            accessibilityLabel={
+              isFavorited
+                ? t('exchange.favoriteRemove')
+                : t('exchange.favoriteAdd')
+            }
+            style={({pressed}) => [
+              styles.favoriteToggleButton,
+              pressed ? styles.favoriteToggleButtonPressed : null,
+            ]}
+            onPress={handleFavoriteToggle}>
+            <PlatformIcon
+              name={isFavorited ? 'star' : 'star-border'}
+              Component={MaterialIcon}
+              size={theme.componentSize.iconBase}
+              color={
+                isFavorited
+                  ? theme.colors.secondary
+                  : theme.colors.textTertiary
+              }
+            />
           </ThrottledPressable>
         </View>
 
@@ -290,7 +452,8 @@ export const ExchangeScreen: React.FC = () => {
         {ready != null && resultRate != null ? (
           <View style={styles.resultCard} testID="exchange.result">
             <Text style={styles.resultLabel}>{t('exchange.resultTitle')}</Text>
-            <Text style={styles.resultOutput}
+            <Text
+              style={styles.resultOutput}
               accessibilityLabel={`${ready.output} ${resultRate.to}`}>
               {formatCurrencyAmount(ready.output, resultRate.to)}
             </Text>
@@ -324,36 +487,6 @@ export const ExchangeScreen: React.FC = () => {
                 </Text>
               </View>
             ) : null}
-
-            {/* 5. Favorite star */}
-            <ThrottledPressable
-              testID="exchange.favoriteToggle"
-              accessibilityRole="button"
-              accessibilityState={{checked: isFavorited}}
-              accessibilityLabel={
-                isFavorited
-                  ? t('exchange.favoriteRemove')
-                  : t('exchange.favoriteAdd')
-              }
-              style={({pressed}) => [
-                styles.favoriteButton,
-                pressed ? styles.favoriteButtonPressed : null,
-              ]}
-              onPress={handleFavoriteToggle}>
-              <PlatformIcon
-                name={isFavorited ? 'star' : 'star-border'}
-                Component={MaterialIcon}
-                size={theme.componentSize.iconBase}
-                color={
-                  isFavorited ? theme.colors.secondary : theme.colors.textTertiary
-                }
-              />
-              <Text style={styles.favoriteButtonText}>
-                {isFavorited
-                  ? t('exchange.favoriteRemove')
-                  : t('exchange.favoriteAdd')}
-              </Text>
-            </ThrottledPressable>
           </View>
         ) : null}
 
@@ -363,7 +496,7 @@ export const ExchangeScreen: React.FC = () => {
           </View>
         ) : null}
 
-        {/* 6. Recent lookups */}
+        {/* 5. Recent lookups */}
         <View style={styles.recentSection}>
           <Text style={styles.sectionLabel}>{t('exchange.recentTitle')}</Text>
           {history.length === 0 ? (
@@ -394,29 +527,31 @@ export const ExchangeScreen: React.FC = () => {
           )}
         </View>
 
-        {/* 7. Favorite pairs */}
+        {/* 6. Favorite pairs */}
         <View style={styles.favoritesSection}>
           <Text style={styles.sectionLabel}>
             {t('exchange.favoritesTitle')}
           </Text>
           {favorites.length === 0 ? (
-            <Text style={styles.emptyText}>{t('exchange.favoritesEmpty')}</Text>
+            <View
+              testID="exchange.favorites.empty"
+              style={styles.favoritesEmpty}>
+              <PlatformIcon
+                name="star-border"
+                Component={MaterialIcon}
+                size={theme.componentSize.iconXxl}
+                color={theme.colors.textTertiary}
+              />
+              <Text style={styles.favoritesEmptyTitle}>
+                {t('exchange.favoritesEmptyTitle')}
+              </Text>
+              <Text style={styles.favoritesEmptySubtitle}>
+                {t('exchange.favoritesEmptySubtitle')}
+              </Text>
+            </View>
           ) : (
-            <View style={styles.favoritesWrap}>
-              {favorites.map(pair => (
-                <ThrottledPressable
-                  key={pair.id}
-                  testID={`exchange.favorite.${pair.id}`}
-                  style={({pressed}) => [
-                    styles.favoriteChip,
-                    pressed ? styles.favoriteChipPressed : null,
-                  ]}
-                  onPress={() => handleRestoreFavorite(pair)}>
-                  <Text style={styles.favoriteChipText}>
-                    {`${pair.from} → ${pair.to}`}
-                  </Text>
-                </ThrottledPressable>
-              ))}
+            <View style={styles.favoritesList}>
+              {favorites.map(pair => renderFavoriteTile(pair))}
             </View>
           )}
         </View>
@@ -465,6 +600,11 @@ const createStyles = (theme: AppTheme) =>
       color: theme.colors.textPrimary,
       marginTop: theme.spacing.xxs,
     },
+    pairChipBadge: {
+      position: 'absolute',
+      top: theme.spacing.xs,
+      right: theme.spacing.xs,
+    },
     swapButton: {
       width: theme.componentSize.stepperButtonSize,
       height: theme.componentSize.stepperButtonSize,
@@ -477,6 +617,20 @@ const createStyles = (theme: AppTheme) =>
     },
     swapButtonPressed: {
       backgroundColor: theme.colors.primaryDark,
+    },
+    favoriteToggleButton: {
+      width: theme.componentSize.iconButtonSize,
+      height: theme.componentSize.iconButtonSize,
+      borderRadius: theme.borderRadius.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: theme.spacing.md,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    favoriteToggleButtonPressed: {
+      backgroundColor: theme.colors.backgroundSecondary,
     },
 
     // 2. Amount
@@ -566,20 +720,6 @@ const createStyles = (theme: AppTheme) =>
       color: theme.colors.onSecondaryContainer,
       marginLeft: theme.spacing.xs,
     },
-    favoriteButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginTop: theme.spacing.base,
-      paddingVertical: theme.spacing.sm,
-    },
-    favoriteButtonPressed: {
-      opacity: 0.6,
-    },
-    favoriteButtonText: {
-      ...theme.typography.labelLarge,
-      color: theme.colors.textSecondary,
-      marginLeft: theme.spacing.sm,
-    },
 
     errorCard: {
       marginTop: theme.spacing.base,
@@ -594,7 +734,7 @@ const createStyles = (theme: AppTheme) =>
       color: theme.colors.error,
     },
 
-    // 6. Recent
+    // 5. Recent
     recentSection: {
       marginTop: theme.spacing.xxl,
     },
@@ -627,27 +767,62 @@ const createStyles = (theme: AppTheme) =>
       color: theme.colors.textTertiary,
     },
 
-    // 7. Favorites
+    // 6. Favorites
     favoritesSection: {
       marginTop: theme.spacing.xxl,
     },
-    favoritesWrap: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
+    favoritesList: {
+      flexDirection: 'column',
     },
-    favoriteChip: {
-      paddingVertical: theme.spacing.sm,
-      paddingHorizontal: theme.spacing.base,
-      backgroundColor: theme.colors.primaryContainer,
-      borderRadius: theme.borderRadius.pill,
-      marginRight: theme.spacing.sm,
+    favoriteTile: {
+      paddingVertical: theme.spacing.base,
+      paddingHorizontal: theme.spacing.lg,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.lg,
+      borderWidth: 1,
+      borderColor: theme.colors.borderLight,
+      marginTop: theme.spacing.sm,
+      ...theme.shadows.xs,
+    },
+    favoriteTilePressed: {
+      backgroundColor: theme.colors.backgroundSecondary,
+    },
+    favoriteTileTitle: {
+      ...theme.typography.titleLarge,
+      color: theme.colors.textPrimary,
+    },
+    favoriteTileNames: {
+      ...theme.typography.bodyMedium,
+      color: theme.colors.textSecondary,
+      marginTop: theme.spacing.xxs,
+    },
+    favoriteTileMeta: {
+      ...theme.typography.labelMedium,
+      color: theme.colors.textTertiary,
+      marginTop: theme.spacing.xs,
+    },
+    favoritesEmpty: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: theme.spacing.xxl,
+      paddingHorizontal: theme.spacing.xl,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.lg,
+      borderWidth: 1,
+      borderColor: theme.colors.borderLight,
+      borderStyle: 'dashed',
       marginTop: theme.spacing.sm,
     },
-    favoriteChipPressed: {
-      backgroundColor: theme.colors.secondaryContainer,
+    favoritesEmptyTitle: {
+      ...theme.typography.bodyLarge,
+      color: theme.colors.textSecondary,
+      marginTop: theme.spacing.md,
+      textAlign: 'center',
     },
-    favoriteChipText: {
-      ...theme.typography.labelLarge,
-      color: theme.colors.onPrimaryContainer,
+    favoritesEmptySubtitle: {
+      ...theme.typography.bodySmall,
+      color: theme.colors.textTertiary,
+      marginTop: theme.spacing.xs,
+      textAlign: 'center',
     },
   });

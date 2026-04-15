@@ -4,8 +4,9 @@ import type {
   ExchangeRate,
 } from '../../domain/models/Currency';
 import type {CurrencyRepository} from '../../domain/repositories/CurrencyRepository';
+import {isRateStale} from '../../domain/usecases/isRateStale';
 import {AppError} from '../../utils/appError';
-import {MMKV_KEY} from '../config';
+import {MMKV_KEY, RATE_TTL_MS} from '../config';
 import {currencyStorage} from '../storage/mmkvStorage';
 
 import type {FrankfurterCurrencyDataSource} from '../datasources/FrankfurterCurrencyDataSource';
@@ -86,5 +87,32 @@ export class FrankfurterCurrencyRepository implements CurrencyRepository {
           : 'unknown network error',
       );
     }
+  }
+
+  async getCachedRate(
+    from: CurrencyCode,
+    to: CurrencyCode,
+  ): Promise<ExchangeRate | null> {
+    if (from === to) {
+      return {
+        from,
+        to,
+        rate: 1,
+        fetchedAt: new Date().toISOString(),
+        isStale: false,
+      };
+    }
+    const cached = this.rateCache.read(from, to);
+    if (cached == null) {
+      return null;
+    }
+    const stale = isRateStale(cached.fetchedAt, Date.now(), RATE_TTL_MS);
+    return {
+      from,
+      to,
+      rate: cached.rate,
+      fetchedAt: cached.fetchedAt,
+      isStale: stale,
+    };
   }
 }
